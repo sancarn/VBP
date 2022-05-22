@@ -1,2 +1,2 @@
 # VBP
-VBA Package manager
+VBA Package manager (very WIP atm)
