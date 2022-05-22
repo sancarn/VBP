@@ -144,7 +144,7 @@ End Function
 '      BEGIN
 '        MultiUse = -1  'True
 '      END
-'      Attribute VB_Name = "VBPM"
+'      Attribute VB_Name = "VBP"
 '      Attribute VB_GlobalNameSpace = False
 '      Attribute VB_Creatable = False
 '      Attribute VB_PredeclaredId = True
