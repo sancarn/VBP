@@ -22,6 +22,13 @@ Private Enum EDependencyType
   DTypeSheet
 End Enum
 
+Private Type tModuleInfo
+  name as string
+  kind as EDependencyType
+  isPredeclared as boolean
+  path as string
+End Type
+
 Private Enum ELocationType
   LocationFileSystem
   LocationInternet
@@ -70,36 +77,41 @@ End Function
 
 '@param {string} URL of class
 Public Function RequireClass(ByVal sUrl as string, ByVal iLocType as ELocationType) as Boolean
-  if not checkModuleExists(sURL) then
-    '..
+  if checkFileExists(sUrl) then
+    Dim info as tModuleInfo: info = getModuleInfo(sUrl)
   end if
 End Function
 
 '@param {string} URL of module
 Public Function RequireModule(ByVal sUrl as string, ByVal iLocType as ELocationType) as Boolean
-  if not checkModuleExists(sURL) then
-    '..
+  Dim sName as string
+  if not checkFileExists(sURL) then
+    Dim info as tModuleInfo: info = getModuleInfo(sUrl)
   end if
 End Function
 
 '@param {string} URL of frm file
 '@param {string} URL of frx file
 Public Function RequireUserForm(ByVal sUrlFrm as string, ByVal sUrlFrx as string, ByVal iLocType as ELocationType) as Boolean
-  if not checkModuleExists(sURL) then
-    '..
+  Dim sName as string
+  if not checkFileExists(sURLFrm) then
+    Dim info as tModuleInfo: info = getModuleInfo(sUrl)
   end if
 End Function
 
 '@param {string} Url of xlsm/xlsa/xls
 Public Function RequireReference(ByVal sUrl as string, ByVal iLocType as ELocationType) as Boolean
-  if not checkModuleExists(sURL) then
-    '..
+  if not checkFileExists(sURL) then
+    Dim ref as Reference: set ref = ThisWorkbook.VBProject.References.AddFromFile(sURL)
+    Dim sName as string: sName = ref.name
+    On Error Resume Next
+    Application.Run sName & ".InstallDependencies"
   end if
 End Function
 
 '@param {string} Url like "C:\...\xxx.json" or "http://.../xxx.json"
 Public Function RequireSheet(ByVal sURL as string, ByVal iLocType as ELocationType) as Boolean
-  if not checkModuleExists(sURL) then
+  if not checkFileExists(sURL) then
     '..
   end if
 End Function
@@ -107,9 +119,9 @@ End Function
 
 
 
-Private Function checkModuleExists(ByVal sFilePath as string) as Boolean
+Private Function checkModuleExists(ByVal sFilePath as string, ByRef sModuleName as string) as Boolean
   Dim bIsPredeclared as boolean
-  Dim sModuleName as string: sModuleName = getModuleName(sFilePath, bIsPredeclared)
+  sModuleName = getModuleName(sFilePath, bIsPredeclared)
 End Function
 
 'Download a file from the internet to file
@@ -167,19 +179,65 @@ End Function
 '      Attribute VB_Creatable = False
 '      Attribute VB_PredeclaredId = True
 '      Attribute VB_Exposed = False
-Private Function getModuleName(ByVal sFilePath as string, ByRef isPredeclared as boolean) as string
+Private Function getModuleInfo(ByVal sFilePath as string) as tModuleInfo
   Dim ff as Long: ff=FreeFile()
+  Dim info as tModuleInfo
+  info.path = sFilePath
   Open sFilePath for Input Access Read as #ff
-    bSearching = true
-    While bSearching
+    Dim bRunning as boolean: bRunning = true
+    Dim iState as Long: iState = 1
+    While bRunning
       Dim sLine as string: Line Input #FileNum, sLine 
-      select case true
-        case sLine = "VERSION 1.0 CLASS"
-          
-        case sLine = "Version 5#" 'Userform
-          isPredeclared = true
+      Dim iType as EDependencyType
+      select case iState
+        case 1
+          select case true
+            case sLine = "VERSION 1.0 CLASS"
+              info.kind = EDependencyType.DTypeClass
+              iState = 2
+            case sLine = "Version 5#" 'Userform
+              info.kind = EDependencyType.DTypeUserform
+              iState = 2
+            case else
+              info.kind = EDependencyType.DTypeNormal
+              iState = 2
+          end select
+        case 2
+          Dim iStart as Long, iEnd as Long, iStatePart as long
+          select case info.kind
+            case EDependencyType.DTypeClass
+              if sLine like "Attribute*VB_Name*" then
+                iStart = instr(1,sLine,"""")
+                iEnd = instr(iStart+1,sLine,"""")
+                info.name = mid(sLine, iStart, iEnd-iStart)
+                iStatePart=iStatePart+1
+              elseif sLine like "Attribute*VB_PredeclaredId*" then
+                info.isPredeclared = sLine like "*[Tt][Rr][Uu][Ee]"
+                iStatePart=iStatePart+1
+              end if
+              if iStatePart = 2 then iState = 3
+            case EDependencyType.DTypeUserform
+              if sLine like "Attribute*VB_Name*" then
+                iStart = instr(1,sLine,"""")
+                iEnd = instr(iStart+1,sLine,"""")
+                info.name = mid(sLine, iStart, iEnd-iStart)
+                iStatePart=iStatePart+1
+              elseif sLine like "Attribute*VB_PredeclaredId*" then
+                info.isPredeclared = sLine like "*[Tt][Rr][Uu][Ee]"
+                iStatePart=iStatePart+1
+              end if
+              if iStatePart = 2 then iState = 3
+            case EDependencyType.DTypeNormal
+              if sLine like "Attribute*VB_Name*" then
+                iStart = instr(1,sLine,"""")
+                iEnd = instr(iStart+1,sLine,"""")
+                info.name = mid(sLine, iStart, iEnd-iStart)
+              end if
+              if iStatePart = 1 then iState = 3
+          end select
+        case 3
+          bRunning = false
       end select
-
     Wend
   Close #ff
 End Function
