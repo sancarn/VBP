@@ -1,5 +1,7 @@
 # VBP (A VBA Package manager)
 
+It should be noted that this is very "Work in Progress", nothing works in this repo currently, and is all a bunch of ideas of how such a package manager could be designed.
+
 * [1. The initial plan](#1.%20The%20initial%20plan)
 * [2. Dealing with version conflicts](#2.%20Dealing%20with%20version%20conflicts)
 * [3. Online Registry](#3.%20Online%20Registry)
